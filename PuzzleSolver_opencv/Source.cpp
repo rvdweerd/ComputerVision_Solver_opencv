@@ -1,9 +1,73 @@
 #include "opencv2/opencv.hpp"
+#include "FrameTimer.h"
+#include <opencv2/core.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
+
+#include <stdio.h>
 #include <iostream>
 #include <vector>
+#include <string>
+
+int stream() {
+	FrameTimer ft;
+	cv::VideoCapture cap;
+	// open the default camera, use something different from 0 otherwise;
+	// Check VideoCapture documentation.
+	int deviceID = 1;
+	int apiID = cv::CAP_ANY;
+	cap.open(deviceID, apiID);
+	if (!cap.isOpened()) {
+		std::cerr << "ERROR! Unable to open camera\n";
+		return -1;
+	}
+
+	cv::dnn::Net model_;
+	cv::dnn::DetectionModel detection_model_ = cv::dnn::DetectionModel(model_);
+	model_ = cv::dnn::readNetFromDarknet("yolov4-tiny.cfg","yolov4-tiny.weights");
+	detection_model_ = cv::dnn::DetectionModel(model_);
+	detection_model_.setInputParams(1 / 255.0, cv::Size2i(416, 416), cv::Scalar(0, 0, 0), true, false);
+	cv::Scalar color(0, 255, 0, 128);
+
+	std::vector<std::string> names = { "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
+	"fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
+	"elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
+	"skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard",
+	"tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
+	"sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
+	"potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone",
+	"microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear",
+	"hair drier", "toothbrush" };
+
+	for (;;)
+	{
+		ft.Mark();
+		cv::Mat frame;
+		cap >> frame;
+		if (frame.empty()) break; // end of video stream
+		std::vector<int> classids;
+		std::vector<float> confidences;
+		std::vector<cv::Rect> boxes;
+		detection_model_.detect(frame, classids, confidences, boxes, 0.25,0.6);
+		for (size_t i = 0; i < boxes.size();++i) {
+			cv::rectangle(frame, boxes[i], color, 2);			
+			cv::putText(frame, names[classids[i]], cv::Point(boxes[i].x + 5, boxes[i].y + 25), cv::FONT_HERSHEY_DUPLEX, 1, color, 1, 8, false);
+			cv::putText(frame, std::to_string(ft.GetFR()), cv::Point(boxes[i].x + 5, boxes[i].y + 50), cv::FONT_HERSHEY_DUPLEX, 1, color, 1, 8, false);
+		}
+		cv::imshow("this is you, smile! :)", frame);
+		if (cv::waitKey(10) == 27) break; // stop capturing by pressing ESC 
+	}
+	// the camera will be closed automatically upon exit
+	// cap.close();
+}
+
+
 
 int main()
 {
+	stream();
+	return 0;
+
 	const auto src = cv::imread("desktop5x5.png", cv::IMREAD_COLOR);
 	cv::Rect roiRect;
 	{
